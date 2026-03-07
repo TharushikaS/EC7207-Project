@@ -6,12 +6,14 @@
 #include <omp.h>
 
 // --- Benchmark Parameters ---
-const int N = 2000;             // Increased to 2000x2000 to stress the CPU
+// const int N = 2000;
+const int N = 500;             // Increased to 2000x2000 to stress the CPU
 const double L = 1.0;           
 const double c = 1.0;           
 const double dx = L / N;        
 const double dt = 0.0005;       // Smaller dt needed for larger N
-const int STEPS = 1000;         // Reduced steps since each step is 16x heavier
+// const int STEPS = 1000;         
+const int STEPS = 2000;         // Reduced steps since each step is 16x heavier
 
 inline int idx(int y, int x) {
     return y * N + x;
