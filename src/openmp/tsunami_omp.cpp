@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <omp.h>
 
-// --- Simulation Parameters ---
+// Simulation Parameters
 const int N = 500;              // Grid Size (N x N)
 const double L = 1.0;           // Physical length of the domain
 const double c_base = 1.0;      // Base wave speed
