@@ -33,24 +33,9 @@ int main(int argc, char* argv[]) {
     std::vector<double> h_curr(N * N, 0.0);
     std::vector<double> h_next(N * N, 0.0);
 
-    // Bathymetry for underwater mountain
-    std::vector<double> bathymetry(N * N, 1.0);  // Default depth = 1.0 (deep ocean)
-
-    // 2. Initialize bathymetry with an underwater mountain
+    // 2. Initial Condition: Create a Gaussian "drop" in the center to start the wave
     int center_y = N / 2;
     int center_x = N / 2;
-    double mountain_radius = N / 10.0;  // Mountain size
-    #pragma omp parallel for collapse(2)
-    for (int y = 0; y < N; y++) {
-        for (int x = 0; x < N; x++) {
-            double distance = std::sqrt(std::pow(x - center_x, 2) + std::pow(y - center_y, 2));
-            if (distance < mountain_radius) {
-                bathymetry[idx(y, x)] = 0.1;  // Shallow water near mountain (slows wave)
-            }
-        }
-    }
-
-    // 3. Initial Condition: Create a Gaussian "drop" in the center to start the wave
     double drop_radius = N / 15.0;
     #pragma omp parallel for collapse(2)
     for (int y = 0; y < N; y++) {
@@ -66,7 +51,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Starting OpenMP Tsunami Simulation (" << N << "x" << N << ") with " << num_threads << " threads...\n";
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    // 4. Main Time Loop
+    // 3. Main Time Loop
     for (int t = 0; t < STEPS; t++) {
 
         // Double nested loop for grid updates
@@ -82,16 +67,13 @@ int main(int argc, char* argv[]) {
                                    h_curr[idx(y, x - 1)] -
                                    4.0 * h_curr[idx(y, x)];
 
-                // Local wave speed based on bathymetry (depth)
-                double c_local = c_base * std::sqrt(bathymetry[idx(y, x)]);
-
                 // Update water height using the wave equation
-                double factor = (c_local * c_local * dt * dt) / (dx * dx);
+                double factor = (c_base * c_base * dt * dt) / (dx * dx);
                 h_next[idx(y, x)] = 2.0 * h_curr[idx(y, x)] - h_prev[idx(y, x)] + factor * laplacian;
             }
         }
 
-        // 5. Reflective Boundary Conditions
+        // 4. Reflective Boundary Conditions
         // Keeping the edges at exactly 0.0 acts as a hard wall, reflecting the wave back.
         #pragma omp parallel for
         for (int i = 0; i < N; i++) {
@@ -101,11 +83,11 @@ int main(int argc, char* argv[]) {
             h_next[idx(i, N - 1)] = 0.0;   // Right edge
         }
 
-        // 6. Pointer Swap (Optimized memory rotation)
+        // 5. Pointer Swap (Optimized memory rotation)
         std::swap(h_prev, h_curr);
         std::swap(h_curr, h_next);
 
-        // 7. Save ground truth data for accuracy validation
+        // 6. Save ground truth data for accuracy validation
         if (t % OUTPUT_FREQ == 0) {
             // Note: Ensure the 'data/ground_truth' directory exists before running
             std::string filename = "../../data/ground_truth/output_" + std::to_string(t) + ".bin";
