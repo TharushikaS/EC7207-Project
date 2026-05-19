@@ -83,42 +83,57 @@ int main(int argc, char* argv[]) {
 
     const int top_neighbor = (rank > 0) ? rank - 1 : MPI_PROC_NULL;
     const int bottom_neighbor = (rank < size - 1) ? rank + 1 : MPI_PROC_NULL;
+    const double factor = (c * c * dt * dt) / (dx * dx);
+
+    auto update_row = [&](int y) {
+        const int global_y = global_start + y - 1;
+
+        if (global_y == 0 || global_y == N - 1) {
+            for (int x = 0; x < N; x++) {
+                h_next[idx(y, x, N)] = 0.0;
+            }
+            return;
+        }
+
+        h_next[idx(y, 0, N)] = 0.0;
+        h_next[idx(y, N - 1, N)] = 0.0;
+
+        for (int x = 1; x < N - 1; x++) {
+            const double laplacian =
+                h_curr[idx(y + 1, x, N)] +
+                h_curr[idx(y - 1, x, N)] +
+                h_curr[idx(y, x + 1, N)] +
+                h_curr[idx(y, x - 1, N)] -
+                4.0 * h_curr[idx(y, x, N)];
+
+            h_next[idx(y, x, N)] =
+                2.0 * h_curr[idx(y, x, N)] - h_prev[idx(y, x, N)] +
+                factor * laplacian;
+        }
+    };
 
     for (int t = 0; t < STEPS; t++) {
-        MPI_Sendrecv(&h_curr[idx(1, 0, N)], N, MPI_DOUBLE, top_neighbor, 0,
-                     &h_curr[idx(rows + 1, 0, N)], N, MPI_DOUBLE, bottom_neighbor, 0,
-                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Request requests[4];
+        MPI_Irecv(&h_curr[idx(0, 0, N)], N, MPI_DOUBLE, top_neighbor, 1,
+                  MPI_COMM_WORLD, &requests[0]);
+        MPI_Irecv(&h_curr[idx(rows + 1, 0, N)], N, MPI_DOUBLE, bottom_neighbor, 0,
+                  MPI_COMM_WORLD, &requests[1]);
+        MPI_Isend(&h_curr[idx(1, 0, N)], N, MPI_DOUBLE, top_neighbor, 0,
+                  MPI_COMM_WORLD, &requests[2]);
+        MPI_Isend(&h_curr[idx(rows, 0, N)], N, MPI_DOUBLE, bottom_neighbor, 1,
+                  MPI_COMM_WORLD, &requests[3]);
 
-        MPI_Sendrecv(&h_curr[idx(rows, 0, N)], N, MPI_DOUBLE, bottom_neighbor, 1,
-                     &h_curr[idx(0, 0, N)], N, MPI_DOUBLE, top_neighbor, 1,
-                     MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        for (int y = 2; y <= rows - 1; y++) {
+            update_row(y);
+        }
 
-        for (int y = 1; y <= rows; y++) {
-            const int global_y = global_start + y - 1;
+        MPI_Waitall(4, requests, MPI_STATUSES_IGNORE);
 
-            if (global_y == 0 || global_y == N - 1) {
-                for (int x = 0; x < N; x++) {
-                    h_next[idx(y, x, N)] = 0.0;
-                }
-                continue;
-            }
-
-            h_next[idx(y, 0, N)] = 0.0;
-            h_next[idx(y, N - 1, N)] = 0.0;
-
-            for (int x = 1; x < N - 1; x++) {
-                const double laplacian =
-                    h_curr[idx(y + 1, x, N)] +
-                    h_curr[idx(y - 1, x, N)] +
-                    h_curr[idx(y, x + 1, N)] +
-                    h_curr[idx(y, x - 1, N)] -
-                    4.0 * h_curr[idx(y, x, N)];
-
-                const double factor = (c * c * dt * dt) / (dx * dx);
-                h_next[idx(y, x, N)] =
-                    2.0 * h_curr[idx(y, x, N)] - h_prev[idx(y, x, N)] +
-                    factor * laplacian;
-            }
+        if (rows >= 1) {
+            update_row(1);
+        }
+        if (rows >= 2) {
+            update_row(rows);
         }
 
         std::swap(h_prev, h_curr);
