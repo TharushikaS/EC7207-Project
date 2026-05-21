@@ -8,11 +8,11 @@
 #include <omp.h>
 
 // Simulation Parameters
-const int N = 500;              // Grid Size (N x N)
+const int N = 1000;             // Grid Size (N x N)
 const double L = 1.0;           // Physical length of the domain
 const double c_base = 1.0;      // Base wave speed
 const double dx = L / N;        // Spatial step
-const double dt = 0.001;        // Time step (2D CFL: dt <= dx/(c*sqrt(2)))
+const double dt = 0.0005;       // Time step (2D CFL: dt <= dx/(c*sqrt(2)))
 const int STEPS = 2000;         // Total time steps
 const int OUTPUT_FREQ = 100;    // How often to save data to disk
 
@@ -52,50 +52,58 @@ int main(int argc, char* argv[]) {
     auto start_time = std::chrono::high_resolution_clock::now();
 
     // 3. Main Time Loop
-    for (int t = 0; t < STEPS; t++) {
+    // One persistent parallel region across all time steps — avoids the fork/join
+    // cost of re-creating a parallel region every iteration. Inside, `omp for` and
+    // `omp single` use implicit barriers to keep threads synchronized.
+    const double factor = (c_base * c_base * dt * dt) / (dx * dx);
 
-        // Double nested loop for grid updates
-        // Bounding from 1 to N-1 to leave the edges for boundary conditions
-        #pragma omp parallel for collapse(2)
-        for (int y = 1; y < N - 1; y++) {
-            for (int x = 1; x < N - 1; x++) {
+    #pragma omp parallel
+    {
+        for (int t = 0; t < STEPS; t++) {
 
-                // 5-point stencil Laplacian
-                double laplacian = h_curr[idx(y + 1, x)] +
-                                   h_curr[idx(y - 1, x)] +
-                                   h_curr[idx(y, x + 1)] +
-                                   h_curr[idx(y, x - 1)] -
-                                   4.0 * h_curr[idx(y, x)];
+            // Stencil update — split (y, x) iterations across threads
+            #pragma omp for collapse(2) schedule(static)
+            for (int y = 1; y < N - 1; y++) {
+                for (int x = 1; x < N - 1; x++) {
 
-                // Update water height using the wave equation
-                double factor = (c_base * c_base * dt * dt) / (dx * dx);
-                h_next[idx(y, x)] = 2.0 * h_curr[idx(y, x)] - h_prev[idx(y, x)] + factor * laplacian;
+                    // 5-point stencil Laplacian
+                    double laplacian = h_curr[idx(y + 1, x)] +
+                                       h_curr[idx(y - 1, x)] +
+                                       h_curr[idx(y, x + 1)] +
+                                       h_curr[idx(y, x - 1)] -
+                                       4.0 * h_curr[idx(y, x)];
+
+                    h_next[idx(y, x)] = 2.0 * h_curr[idx(y, x)] - h_prev[idx(y, x)] + factor * laplacian;
+                }
             }
-        }
+            // implicit barrier here — all threads done before boundaries
 
-        // 4. Dirichlet (fixed-wall) Boundary Conditions
-        // Holding edges at h = 0 reflects waves back with phase inversion (fixed-end reflection).
-        #pragma omp parallel for
-        for (int i = 0; i < N; i++) {
-            h_next[idx(0, i)] = 0.0;       // Top edge
-            h_next[idx(N - 1, i)] = 0.0;   // Bottom edge
-            h_next[idx(i, 0)] = 0.0;       // Left edge
-            h_next[idx(i, N - 1)] = 0.0;   // Right edge
-        }
-
-        // 5. Pointer Swap (Optimized memory rotation)
-        std::swap(h_prev, h_curr);
-        std::swap(h_curr, h_next);
-
-        // 6. Save ground truth data for accuracy validation
-        if (t % OUTPUT_FREQ == 0) {
-            // Note: Ensure the 'data/ground_truth' directory exists before running
-            std::string filename = "../../data/ground_truth/omp_output_" + std::to_string(t) + ".bin";
-            std::ofstream outfile(filename, std::ios::binary);
-            if (outfile.is_open()) {
-                outfile.write(reinterpret_cast<char*>(h_curr.data()), N * N * sizeof(double));
-                outfile.close();
+            // 4. Dirichlet (fixed-wall) Boundary Conditions
+            #pragma omp for schedule(static)
+            for (int i = 0; i < N; i++) {
+                h_next[idx(0, i)] = 0.0;       // Top edge
+                h_next[idx(N - 1, i)] = 0.0;   // Bottom edge
+                h_next[idx(i, 0)] = 0.0;       // Left edge
+                h_next[idx(i, N - 1)] = 0.0;   // Right edge
             }
+            // implicit barrier here
+
+            // 5. Pointer swap + optional I/O — one thread only
+            #pragma omp single
+            {
+                std::swap(h_prev, h_curr);
+                std::swap(h_curr, h_next);
+
+                if (t % OUTPUT_FREQ == 0) {
+                    std::string filename = "../../data/ground_truth/omp_output_" + std::to_string(t) + ".bin";
+                    std::ofstream outfile(filename, std::ios::binary);
+                    if (outfile.is_open()) {
+                        outfile.write(reinterpret_cast<char*>(h_curr.data()), N * N * sizeof(double));
+                        outfile.close();
+                    }
+                }
+            }
+            // implicit barrier at end of single — all threads see the swapped pointers
         }
     }
 
