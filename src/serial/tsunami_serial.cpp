@@ -11,7 +11,7 @@ const int N = 500;              // Grid Size (N x N)
 const double L = 1.0;           // Physical length of the domain
 const double c = 1.0;           // Wave speed
 const double dx = L / N;        // Spatial step
-const double dt = 0.001;        // Time step (Must satisfy dt < dx/c for stability)
+const double dt = 0.001;        // Time step (2D CFL: dt <= dx/(c*sqrt(2)))
 const int STEPS = 2000;         // Total time steps
 const int OUTPUT_FREQ = 100;    // How often to save data to disk
 
@@ -65,8 +65,8 @@ int main() {
             }
         }
 
-        // 4. Reflective Boundary Conditions 
-        // Keeping the edges at exactly 0.0 acts as a hard wall, reflecting the wave back.
+        // 4. Dirichlet (fixed-wall) Boundary Conditions
+        // Holding edges at h = 0 reflects waves back with phase inversion (fixed-end reflection).
         for (int i = 0; i < N; i++) {
             h_next[idx(0, i)] = 0.0;       // Top edge
             h_next[idx(N - 1, i)] = 0.0;   // Bottom edge

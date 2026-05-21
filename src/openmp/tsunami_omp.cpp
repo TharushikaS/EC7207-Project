@@ -12,7 +12,7 @@ const int N = 500;              // Grid Size (N x N)
 const double L = 1.0;           // Physical length of the domain
 const double c_base = 1.0;      // Base wave speed
 const double dx = L / N;        // Spatial step
-const double dt = 0.001;        // Time step (Must satisfy dt < dx/c for stability)
+const double dt = 0.001;        // Time step (2D CFL: dt <= dx/(c*sqrt(2)))
 const int STEPS = 2000;         // Total time steps
 const int OUTPUT_FREQ = 100;    // How often to save data to disk
 
@@ -73,8 +73,8 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        // 4. Reflective Boundary Conditions
-        // Keeping the edges at exactly 0.0 acts as a hard wall, reflecting the wave back.
+        // 4. Dirichlet (fixed-wall) Boundary Conditions
+        // Holding edges at h = 0 reflects waves back with phase inversion (fixed-end reflection).
         #pragma omp parallel for
         for (int i = 0; i < N; i++) {
             h_next[idx(0, i)] = 0.0;       // Top edge
@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
         // 6. Save ground truth data for accuracy validation
         if (t % OUTPUT_FREQ == 0) {
             // Note: Ensure the 'data/ground_truth' directory exists before running
-            std::string filename = "../../data/ground_truth/output_" + std::to_string(t) + ".bin";
+            std::string filename = "../../data/ground_truth/omp_output_" + std::to_string(t) + ".bin";
             std::ofstream outfile(filename, std::ios::binary);
             if (outfile.is_open()) {
                 outfile.write(reinterpret_cast<char*>(h_curr.data()), N * N * sizeof(double));
