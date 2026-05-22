@@ -141,10 +141,10 @@ Hybrid Execution Time (2 MPI processes x 4 OpenMP threads): 4.10881 seconds
 
 ## Benchmark Sweep
 
-To produce the full scaling study (`data/benchmarks.csv`) with averaging:
+To build everything and produce the full scaling study (`data/benchmarks.csv`) with averaging:
 
 ```bash
-./scripts/run_benchmarks_v2.sh
+make bench
 ```
 
 This runs **each configuration three times** and records the minimum time (best-case, removes one-off OS noise). The full sweep covers:
@@ -153,8 +153,18 @@ This runs **each configuration three times** and records the minimum time (best-
 - OpenMP — 1, 2, 4, 8 threads
 - MPI — 1, 2, 4, 8 processes
 - Hybrid — 2×2, 2×4, 4×2 (processes × threads)
+- CUDA — 1 configuration (skipped automatically if `nvcc` is not on `PATH`)
 
 Total runtime: ~10–15 minutes unattended.
+
+Useful overrides:
+
+```bash
+make bench MPIFLAGS=--oversubscribe     # machines without enough physical cores
+make bench RUNS_PER_CFG=5               # tighter best-of-5 sweep
+make bench-cuda                         # CUDA only
+make help                               # full target list
+```
 
 ## Visualization Dashboard
 
@@ -193,15 +203,14 @@ cd scripts && python3 visualize.py
 ```
 EC7207-Project/
 ├── README.md
+├── Makefile                     # Build + best-of-N benchmark sweep (incl. CUDA)
 ├── DEMO_RUNBOOK.md              # Step-by-step live-demo script
 ├── PRESENTER_GUIDE.md           # Full presenter's guide with code deep-dive
 ├── EC7207_Presentation.pptx     # 12-slide presentation
 ├── data/
-│   ├── benchmarks.csv           # Timing results (produced by run_benchmarks_v2.sh)
+│   ├── benchmarks.csv           # Timing results (produced by `make bench`)
 │   └── ground_truth/            # *.bin frames from each implementation
 ├── scripts/
-│   ├── run_benchmarks.sh        # Single-run benchmark sweep
-│   ├── run_benchmarks_v2.sh     # Averaged (best-of-3) benchmark sweep
 │   ├── generate_slides.js       # pptxgenjs script that builds the deck
 │   └── visualize.py             # Matplotlib 3D wave animation
 └── src/
