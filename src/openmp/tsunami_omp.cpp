@@ -12,7 +12,7 @@ const int N = 2000;             // Grid Size (N x N)
 const double L = 1.0;           // Physical length of the domain
 const double c_base = 1.0;      // Base wave speed
 const double dx = L / N;        // Spatial step
-const double dt = 0.0005;       // Time step (2D CFL: dt <= dx/(c*sqrt(2)))
+const double dt = 0.00025;      // Time step. 2D CFL: dt <= dx/(c*sqrt(2)) ≈ 3.54e-4 at N=2000; we use 2.5e-4 for CFL=0.5.
 const int STEPS = 2000;         // Total time steps
 const int OUTPUT_FREQ = 100;    // How often to save data to disk
 

@@ -25,8 +25,9 @@ const double c = 1.0;
 // Distance between neighboring cells
 const double dx = L / N;
 
-// Time step size
-const double dt = 0.0005;
+// Time step size. 2D CFL requires dt <= dx/(c*sqrt(2)) ≈ 3.54e-4 at N=2000;
+// 2.5e-4 keeps CFL = 0.5 (same safety margin the project used at N=1000).
+const double dt = 0.00025;
 
 // Number of simulation timesteps
 const int STEPS = 2000;
