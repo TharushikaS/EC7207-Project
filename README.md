@@ -57,6 +57,7 @@ h[i,j]^(n+1) = 2·h[i,j]^n − h[i,j]^(n−1) + (c·Δt/Δx)² · [ h[i+1,j] + h
 | OpenMP | [src/openmp/tsunami_omp.cpp](src/openmp/tsunami_omp.cpp) | Shared-memory threads (`#pragma omp parallel` outside the time loop, `omp for` and `omp single` inside) |
 | MPI | [src/mpi/tsunami_mpi.cpp](src/mpi/tsunami_mpi.cpp) | Distributed-memory processes with non-blocking halo exchange (`MPI_Isend` / `MPI_Irecv`) and compute–communication overlap |
 | Hybrid | [src/hybrid/tsunami_hybrid.cpp](src/hybrid/tsunami_hybrid.cpp) | MPI between processes + OpenMP within each process (two-level parallelism, `MPI_THREAD_FUNNELED`) |
+| CUDA   | [src/cuda/tsunami_cuda.cu](src/cuda/tsunami_cuda.cu) | GPU accelerator: one thread per cell, 16×16 blocks with shared-memory halo tiling so each stencil neighbour is read from on-chip memory |
 
 ---
 
@@ -77,6 +78,14 @@ mpic++ --version    # MPI compiler wrapper (OpenMPI 4.x)
 mpiexec --version   # MPI launcher
 ```
 
+The CUDA implementation is optional and only needed if you have an NVIDIA
+GPU. Install the CUDA Toolkit (12.x recommended) and verify with:
+
+```bash
+nvcc --version      # NVCC compiler
+nvidia-smi          # Driver + GPU visible
+```
+
 ## Build
 
 Compile all four implementations from the project root:
@@ -86,12 +95,16 @@ cd src/serial   && g++ -O3 -o tsunami_serial tsunami_serial.cpp                &
 cd src/openmp   && g++ -O3 -fopenmp -o tsunami_omp tsunami_omp.cpp             && cd ../..
 cd src/mpi      && mpic++ -O3 -o tsunami_mpi tsunami_mpi.cpp                   && cd ../..
 cd src/hybrid   && mpic++ -O3 -fopenmp -o tsunami_hybrid tsunami_hybrid.cpp    && cd ../..
+cd src/cuda     && nvcc -O3 -o tsunami_cuda tsunami_cuda.cu                    && cd ../..
 ```
 
 Compiler flags:
 - `-O3` — maximum optimization (loop unrolling, auto-vectorization, inlining)
 - `-fopenmp` — enables OpenMP pragmas and links the OpenMP runtime
 - `mpic++` — wrapper around `g++` that includes the MPI headers/libraries
+- `nvcc` — NVIDIA CUDA compiler; pass `-arch=sm_XX` to target a specific GPU
+  (e.g. `-arch=sm_75` for Turing, `-arch=sm_86` for Ampere) if you need to
+  override the default device architecture
 
 ## Run
 
@@ -109,6 +122,9 @@ cd src/mpi    && mpiexec -n 4 ./tsunami_mpi && cd ../..
 
 # Hybrid: P MPI processes × T OpenMP threads per process
 cd src/hybrid && mpiexec -n 2 ./tsunami_hybrid 4 && cd ../..
+
+# CUDA (single GPU)
+cd src/cuda   && ./tsunami_cuda && cd ../..
 ```
 
 If `mpiexec` complains about not enough slots, add `--oversubscribe`:
@@ -193,6 +209,7 @@ EC7207-Project/
     ├── openmp/tsunami_omp.cpp
     ├── mpi/tsunami_mpi.cpp
     ├── hybrid/tsunami_hybrid.cpp
+    ├── cuda/tsunami_cuda.cu
     └── dashboard/
         ├── app.py               # Streamlit dashboard
         └── requirements.txt

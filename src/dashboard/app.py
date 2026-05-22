@@ -33,8 +33,15 @@ IMPL_FILE_PREFIX = {
     "openmp": "omp_output_",
     "mpi":    "mpi_output_",
     "hybrid": "hybrid_output_",
+    "cuda":   "cuda_output_",
 }
-IMPL_LABEL = {"serial": "Serial", "openmp": "OpenMP", "mpi": "MPI", "hybrid": "Hybrid"}
+IMPL_LABEL = {
+    "serial": "Serial",
+    "openmp": "OpenMP",
+    "mpi":    "MPI",
+    "hybrid": "Hybrid",
+    "cuda":   "CUDA",
+}
 
 st.set_page_config(page_title="Tsunami HPC Demo — Group 48", layout="wide")
 
@@ -73,6 +80,7 @@ def load_benchmarks() -> tuple[pd.DataFrame, bool]:
             ("openmp", 1, 4, 3.31),
             ("mpi",    4, 1, 3.40),
             ("hybrid", 2, 4, 0.95),
+            ("cuda",   1, 1, 0.18),
         ],
         columns=["implementation", "processes", "threads", "time_seconds"],
     )

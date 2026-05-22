@@ -36,6 +36,7 @@ src/hybrid/tsunami_hybrid
 src/mpi/tsunami_mpi
 src/openmp/tsunami_omp
 src/serial/tsunami_serial
+src/cuda/tsunami_cuda
 
 # Python
 __pycache__/
