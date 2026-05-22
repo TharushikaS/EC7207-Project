@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MPI — Tsunami HPC Animation</title>
+<style>
+  :root {
+    --primary: #065A82;
+    --dark:    #21295C;
+    --light:   #F1F5F9;
+    --muted:   #64748B;
+    --border:  #CBD5E1;
+    --halo:    #FBBF24;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Calibri, sans-serif; background: var(--light); margin: 0; padding: 30px; display: flex; justify-content: center; }
+  .card { background: white; max-width: 720px; width: 100%; padding: 32px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+  h1 { margin: 0 0 4px; color: var(--primary); font-family: Cambria, serif; font-size: 28px; }
+  .subtitle { margin: 0 0 24px; color: var(--muted); font-size: 15px; }
+  .status { background: var(--dark); color: white; padding: 14px 20px; border-radius: 6px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 20px; font-size: 13px; }
+  .status .label { opacity: .65; text-transform: uppercase; letter-spacing: 1.5px; font-size: 10px; }
+  .status .value { font-weight: bold; font-size: 18px; margin-top: 2px; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; font-size: 13px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 16px; height: 16px; border-radius: 3px; border: 1px solid rgba(0,0,0,.1); }
+  .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; background: var(--border); padding: 2px; border-radius: 4px; aspect-ratio: 1; max-width: 500px; margin: 0 auto; }
+  .cell { background: white; transition: background-color .15s ease; aspect-ratio: 1; border-radius: 2px; }
+  .controls { display: flex; gap: 12px; justify-content: center; margin-top: 24px; }
+  button { background: var(--primary); color: white; border: 0; padding: 10px 22px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+  button:hover { background: #1C7293; }
+  button.secondary { background: var(--muted); }
+  .explanation { margin-top: 24px; padding: 16px; background: var(--light); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 14px; color: var(--dark); line-height: 1.6; }
+  .nav { text-align: center; margin-top: 24px; font-size: 14px; }
+  .nav a { color: var(--primary); text-decoration: none; margin: 0 8px; }
+  .nav a:hover { text-decoration: underline; }
+  .halo-pulse { animation: halopulse .9s ease infinite; }
+  @keyframes halopulse {
+    0%, 100% { box-shadow: inset 0 0 0 0 var(--halo); }
+    50%      { box-shadow: inset 0 0 0 3px var(--halo); }
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>MPI — Distributed-Memory Processes</h1>
+  <p class="subtitle">Four processes each sweep their own band serially. All four bands advance in parallel.</p>
+
+  <div class="status">
+    <div><div class="label">Timestep</div><div class="value" id="t">1</div></div>
+    <div><div class="label">Phase</div><div class="value" id="phase">Halo exchange</div></div>
+    <div><div class="label">Threads / processes</div><div class="value">1 / 4</div></div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="swatch" style="background:#065A82"></div>Process 0 (rows 0–2)</div>
+    <div class="legend-item"><div class="swatch" style="background:#F59E0B"></div>Process 1 (rows 3–4)</div>
+    <div class="legend-item"><div class="swatch" style="background:#10B981"></div>Process 2 (rows 5–6)</div>
+    <div class="legend-item"><div class="swatch" style="background:#EF4444"></div>Process 3 (rows 7–9)</div>
+    <div class="legend-item"><div class="swatch" style="background:#FBBF24"></div>Halo row (MPI exchange)</div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="controls">
+    <button id="playBtn">⏸ Pause</button>
+    <button id="resetBtn" class="secondary">↺ Restart</button>
+  </div>
+
+  <div class="explanation">
+    <strong>How it works:</strong> The grid is split into four horizontal bands, one per MPI process. Each process owns its band in its own private memory.
+    Before each timestep, neighbouring processes <strong>exchange halo rows</strong> via <code>MPI_Isend</code>/<code>MPI_Irecv</code> (yellow pulse).
+    Then every process sweeps <strong>its own band cell-by-cell, sequentially</strong> — but <strong>all four bands run in parallel</strong>. Because each band has only one thread, individual cells within a band light up one at a time, just like the serial version — only now four bands are doing it simultaneously.
+  </div>
+
+  <div class="nav">
+    <a href="openmp.html">← OpenMP</a> |
+    <a href="index.html">Index</a> |
+    <a href="hybrid.html">Hybrid →</a>
+  </div>
+</div>
+
+<script>
+  const N = 10;
+  // Each process owns a band of contiguous rows. They sweep their band cell by cell.
+  const PROCS = [
+    { color: '#065A82', rows: [0, 1, 2] },
+    { color: '#F59E0B', rows: [3, 4] },
+    { color: '#10B981', rows: [5, 6] },
+    { color: '#EF4444', rows: [7, 8, 9] },
+  ];
+
+  // Each process gets a list of cell indices to sweep through in order
+  PROCS.forEach(p => {
+    p.cells = [];
+    p.rows.forEach(r => {
+      for (let x = 0; x < N; x++) p.cells.push(r * N + x);
+    });
+  });
+
+  const HALO_ROWS = [2, 3, 4, 5, 6, 7]; // rows that pulse during halo exchange
+
+  const grid = document.getElementById('grid');
+  const cells = [];
+  for (let i = 0; i < N * N; i++) {
+    const c = document.createElement('div');
+    c.className = 'cell';
+    grid.appendChild(c);
+    cells.push(c);
+  }
+
+  let timestep = 1;
+  let phase = 'halo';   // 'halo' -> 'compute' -> 'barrier'
+  let cellIdx = 0;       // shared index — each process is at this position in its own cell list
+  let playing = true;
+  const HALO_MS = 1100;
+  const COMPUTE_MS = 110;
+  const BARRIER_MS = 500;
+
+  const tEl = document.getElementById('t');
+  const phaseEl = document.getElementById('phase');
+  const playBtn = document.getElementById('playBtn');
+
+  function paintBands() {
+    PROCS.forEach(p => {
+      p.cells.forEach(idx => { cells[idx].style.background = p.color + '22'; }); // faded fill
+    });
+  }
+  function clearAll() {
+    cells.forEach(c => { c.style.background = 'white'; c.classList.remove('halo-pulse'); });
+  }
+
+  function reset() {
+    clearAll(); paintBands();
+    timestep = 1; phase = 'halo'; cellIdx = 0;
+    tEl.textContent = timestep;
+    phaseEl.textContent = 'Halo exchange';
+  }
+
+  function doHalo(cb) {
+    phaseEl.textContent = '⇅ Halo exchange';
+    HALO_ROWS.forEach(r => {
+      for (let x = 0; x < N; x++) cells[r * N + x].classList.add('halo-pulse');
+    });
+    setTimeout(() => {
+      HALO_ROWS.forEach(r => {
+        for (let x = 0; x < N; x++) cells[r * N + x].classList.remove('halo-pulse');
+      });
+      cb();
+    }, HALO_MS);
+  }
+
+  function doCompute() {
+    phaseEl.textContent = 'Computing (parallel bands)';
+    PROCS.forEach(p => {
+      if (cellIdx < p.cells.length) {
+        cells[p.cells[cellIdx]].style.background = p.color;
+      }
+    });
+    cellIdx++;
+  }
+
+  function doBarrier(cb) {
+    phaseEl.textContent = '⚡ MPI_Waitall';
+    setTimeout(() => {
+      clearAll(); paintBands();
+      timestep++; tEl.textContent = timestep;
+      cellIdx = 0;
+      phase = 'halo';
+      phaseEl.textContent = 'Halo exchange';
+      cb();
+    }, BARRIER_MS);
+  }
+
+  function step() {
+    if (phase === 'halo') {
+      phase = 'compute';
+      doHalo(() => {/* compute starts on the next tick */});
+      return;
+    }
+    if (phase === 'compute') {
+      // Determine the max band length so we keep ticking until ALL bands finish.
+      const maxLen = Math.max(...PROCS.map(p => p.cells.length));
+      if (cellIdx < maxLen) {
+        doCompute();
+      } else {
+        phase = 'barrier';
+        doBarrier(() => {});
+      }
+    }
+  }
+
+  function loop() {
+    if (playing) step();
+    const wait = phase === 'halo' ? HALO_MS : (phase === 'barrier' ? BARRIER_MS + 100 : COMPUTE_MS);
+    setTimeout(loop, wait);
+  }
+
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    playBtn.textContent = playing ? '⏸ Pause' : '▶ Play';
+  });
+  document.getElementById('resetBtn').addEventListener('click', reset);
+
+  paintBands();
+  loop();
+</script>
+</body>
+</html>

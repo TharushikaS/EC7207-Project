@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Serial — Tsunami HPC Animation</title>
+<style>
+  :root {
+    --primary: #065A82;
+    --dark:    #21295C;
+    --light:   #F1F5F9;
+    --muted:   #64748B;
+    --border:  #CBD5E1;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Calibri, sans-serif;
+    background: var(--light);
+    margin: 0; padding: 30px;
+    display: flex; justify-content: center;
+  }
+  .card {
+    background: white;
+    max-width: 720px;
+    width: 100%;
+    padding: 32px;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.08);
+  }
+  h1 {
+    margin: 0 0 4px;
+    color: var(--primary);
+    font-family: Cambria, serif;
+    font-size: 28px;
+  }
+  .subtitle { margin: 0 0 24px; color: var(--muted); font-size: 15px; }
+  .status {
+    background: var(--dark);
+    color: white;
+    padding: 14px 20px;
+    border-radius: 6px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 20px;
+    font-size: 13px;
+  }
+  .status .label { opacity: .65; text-transform: uppercase; letter-spacing: 1.5px; font-size: 10px; }
+  .status .value { font-weight: bold; font-size: 18px; margin-top: 2px; }
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    margin-bottom: 16px; font-size: 13px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 16px; height: 16px; border-radius: 3px; border: 1px solid rgba(0,0,0,.1); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 2px;
+    background: var(--border);
+    padding: 2px;
+    border-radius: 4px;
+    aspect-ratio: 1;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+  .cell {
+    background: white;
+    transition: background-color .15s ease;
+    aspect-ratio: 1;
+    border-radius: 2px;
+  }
+  .controls {
+    display: flex; gap: 12px; justify-content: center;
+    margin-top: 24px;
+  }
+  button {
+    background: var(--primary);
+    color: white;
+    border: 0;
+    padding: 10px 22px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color .15s;
+  }
+  button:hover { background: #1C7293; }
+  button.secondary { background: var(--muted); }
+  .explanation {
+    margin-top: 24px;
+    padding: 16px;
+    background: var(--light);
+    border-left: 4px solid var(--primary);
+    border-radius: 4px;
+    font-size: 14px;
+    color: var(--dark);
+    line-height: 1.6;
+  }
+  .nav {
+    text-align: center;
+    margin-top: 24px;
+    font-size: 14px;
+  }
+  .nav a {
+    color: var(--primary);
+    text-decoration: none;
+    margin: 0 8px;
+  }
+  .nav a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Serial Execution</h1>
+  <p class="subtitle">One thread updates every cell, one at a time, row by row.</p>
+
+  <div class="status">
+    <div><div class="label">Timestep</div><div class="value" id="t">1</div></div>
+    <div><div class="label">Cells done</div><div class="value" id="done">0 / 100</div></div>
+    <div><div class="label">Threads / processes</div><div class="value">1 / 1</div></div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="swatch" style="background:#065A82"></div>Single worker</div>
+    <div class="legend-item"><div class="swatch" style="background:white;border:1px solid #CBD5E1"></div>Not yet computed</div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="controls">
+    <button id="playBtn">⏸ Pause</button>
+    <button id="resetBtn" class="secondary">↺ Restart</button>
+  </div>
+
+  <div class="explanation">
+    <strong>How it works:</strong> A single thread executes the nested loops over <code>(y, x)</code>.
+    Every cell at timestep <code>n+1</code> is computed sequentially — cell (0,0), then (0,1), then (0,2)…
+    After all 100 cells finish, the time loop advances and the sweep starts again.
+    No parallelism. Total work = 100 cells × number of timesteps, all done by one CPU core.
+  </div>
+
+  <div class="nav">
+    <a href="index.html">← Index</a> |
+    <a href="openmp.html">OpenMP →</a>
+  </div>
+</div>
+
+<script>
+  const N = 10;
+  const grid = document.getElementById('grid');
+  const cells = [];
+  for (let i = 0; i < N * N; i++) {
+    const c = document.createElement('div');
+    c.className = 'cell';
+    grid.appendChild(c);
+    cells.push(c);
+  }
+
+  let cellIdx = 0;
+  let timestep = 1;
+  let playing = true;
+  let timer = null;
+  const SPEED = 60; // ms per cell
+
+  const tEl = document.getElementById('t');
+  const doneEl = document.getElementById('done');
+  const playBtn = document.getElementById('playBtn');
+
+  function reset() {
+    cellIdx = 0;
+    timestep = 1;
+    cells.forEach(c => c.style.background = 'white');
+    tEl.textContent = timestep;
+    doneEl.textContent = '0 / 100';
+  }
+
+  function step() {
+    if (cellIdx >= N * N) {
+      // Done with this timestep — reset for next
+      setTimeout(() => {
+        cells.forEach(c => c.style.background = 'white');
+        cellIdx = 0;
+        timestep++;
+        tEl.textContent = timestep;
+        doneEl.textContent = '0 / 100';
+      }, 400);
+      return;
+    }
+    cells[cellIdx].style.background = '#065A82';
+    cellIdx++;
+    doneEl.textContent = cellIdx + ' / 100';
+  }
+
+  function loop() {
+    if (playing) step();
+    timer = setTimeout(loop, SPEED);
+  }
+
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    playBtn.textContent = playing ? '⏸ Pause' : '▶ Play';
+  });
+  document.getElementById('resetBtn').addEventListener('click', reset);
+
+  loop();
+</script>
+</body>
+</html>

@@ -8,7 +8,7 @@
 #include <omp.h>
 
 // Simulation Parameters
-const int N = 1000;             // Grid Size (N x N)
+const int N = 2000;             // Grid Size (N x N)
 const double L = 1.0;           // Physical length of the domain
 const double c_base = 1.0;      // Base wave speed
 const double dx = L / N;        // Spatial step
@@ -57,12 +57,12 @@ int main(int argc, char* argv[]) {
     // `omp single` use implicit barriers to keep threads synchronized.
     const double factor = (c_base * c_base * dt * dt) / (dx * dx);
 
-    #pragma omp parallel
+    #pragma omp parallel //creates a team of threads.
     {
         for (int t = 0; t < STEPS; t++) {
 
             // Stencil update — split (y, x) iterations across threads
-            #pragma omp for collapse(2) schedule(static)
+            #pragma omp for collapse(2) schedule(static) //divide loop iterations among threads, collapse(2) combines nested loops, Static divide work evenly
             for (int y = 1; y < N - 1; y++) {
                 for (int x = 1; x < N - 1; x++) {
 
@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
             // implicit barrier here — all threads done before boundaries
 
             // 4. Dirichlet (fixed-wall) Boundary Conditions
-            #pragma omp for schedule(static)
+            #pragma omp for schedule(static) //Again: work divided among threads.
             for (int i = 0; i < N; i++) {
                 h_next[idx(0, i)] = 0.0;       // Top edge
                 h_next[idx(N - 1, i)] = 0.0;   // Bottom edge
@@ -89,18 +89,18 @@ int main(int argc, char* argv[]) {
             // implicit barrier here
 
             // 5. Pointer swap + optional I/O — one thread only
-            #pragma omp single
+            #pragma omp single //ONLY ONE THREAD executes this block
             {
                 std::swap(h_prev, h_curr);
                 std::swap(h_curr, h_next);
 
                 if (t % OUTPUT_FREQ == 0) {
-                    std::string filename = "../../data/ground_truth/omp_output_" + std::to_string(t) + ".bin";
-                    std::ofstream outfile(filename, std::ios::binary);
-                    if (outfile.is_open()) {
-                        outfile.write(reinterpret_cast<char*>(h_curr.data()), N * N * sizeof(double));
-                        outfile.close();
-                    }
+                //    std::string filename = "../../data/ground_truth/omp_output_" + std::to_string(t) + ".bin";
+                 //   std::ofstream outfile(filename, std::ios::binary);
+                   // if (outfile.is_open()) {
+                      //  outfile.write(reinterpret_cast<char*>(h_curr.data()), N * N * sizeof(double));
+                  //      outfile.close();
+                 //   }
                 }
             }
             // implicit barrier at end of single — all threads see the swapped pointers

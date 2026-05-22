@@ -5,7 +5,7 @@ import matplotlib.animation as animation
 import os
 
 # --- Configuration ---
-N = 500  # Must match the N in your C++ code
+N = 2000  # Must match the N in your C++ code
 STEPS = 2000
 OUTPUT_FREQ = 100
 DATA_DIR = "../data/ground_truth/" # Path relative to the scripts folder

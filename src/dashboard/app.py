@@ -19,7 +19,7 @@ import streamlit as st
 
 # --- Configuration ----------------------------------------------------------
 
-GRID_N = 1000
+GRID_N = 2000
 STEPS = 2000
 OUTPUT_FREQ = 100
 FRAME_STEPS = list(range(0, STEPS, OUTPUT_FREQ))

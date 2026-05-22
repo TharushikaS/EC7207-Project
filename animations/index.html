@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tsunami HPC — Parallel Execution Animations</title>
+<style>
+  :root {
+    --primary: #065A82;
+    --dark:    #21295C;
+    --light:   #F1F5F9;
+    --muted:   #64748B;
+    --border:  #CBD5E1;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Calibri, sans-serif;
+    background: var(--light);
+    margin: 0; padding: 40px 20px;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  h1 { color: var(--primary); font-family: Cambria, serif; font-size: 36px; margin: 0 0 6px; }
+  .subtitle { color: var(--muted); margin: 0 0 8px; font-size: 16px; }
+  .meta { color: var(--muted); font-size: 13px; margin: 0 0 32px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  .tile {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.08);
+    text-decoration: none;
+    color: inherit;
+    transition: transform .15s, box-shadow .15s;
+    display: block;
+    border-top: 4px solid var(--primary);
+  }
+  .tile:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+  .tile h2 { margin: 0 0 4px; color: var(--primary); font-family: Cambria, serif; font-size: 22px; }
+  .tile p { color: var(--muted); margin: 0; font-size: 14px; line-height: 1.5; }
+  .tile .tags { margin-top: 12px; font-size: 12px; }
+  .tag {
+    background: var(--light);
+    color: var(--dark);
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-right: 4px;
+    font-weight: bold;
+  }
+  .footer { margin-top: 40px; color: var(--muted); font-size: 13px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Parallel Execution Animations</h1>
+  <p class="subtitle">Visualising how a 10 × 10 grid is computed under four different parallelisation strategies.</p>
+  <p class="meta">EC7207 · Group 48 · Tsunami HPC Simulation</p>
+
+  <div class="grid">
+    <a class="tile" href="serial.html">
+      <h2>1 · Serial</h2>
+      <p>A single thread sweeps the grid cell by cell, row by row. The baseline against which every parallel version is measured.</p>
+      <div class="tags"><span class="tag">1 process</span><span class="tag">1 thread</span></div>
+    </a>
+
+    <a class="tile" href="openmp.html">
+      <h2>2 · OpenMP</h2>
+      <p>Four shared-memory threads each take a band of rows and compute in parallel within a single timestep. Implicit barrier at the end of each step.</p>
+      <div class="tags"><span class="tag">1 process</span><span class="tag">4 threads</span></div>
+    </a>
+
+    <a class="tile" href="mpi.html">
+      <h2>3 · MPI</h2>
+      <p>Four processes own four bands in separate memory. Boundary rows are exchanged before each timestep using non-blocking MPI sends/receives.</p>
+      <div class="tags"><span class="tag">4 processes</span><span class="tag">1 thread each</span></div>
+    </a>
+
+    <a class="tile" href="hybrid.html">
+      <h2>4 · Hybrid</h2>
+      <p>Two MPI processes (top and bottom halves), each running two OpenMP threads. MPI between processes, OpenMP within.</p>
+      <div class="tags"><span class="tag">2 processes</span><span class="tag">2 threads each</span></div>
+    </a>
+  </div>
+
+  <p class="footer">Open each page in a browser. They auto-play and loop. Pause/restart with the buttons.</p>
+</div>
+</body>
+</html>

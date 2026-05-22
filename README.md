@@ -1,7 +1,7 @@
 # High-Performance Simulation of Tsunami Wave Propagation
 
-**EC7207 — High Performance Computing**
-**Group 48** — Faculty of Engineering
+**EC7207 - High Performance Computing**
+**- Group 48** 
 
 | Reg. No. | Name |
 |----------|------|
@@ -240,3 +240,9 @@ Measured on a 4-physical-core (8-logical with hyperthreading) x86 CPU under WSL2
 ## License
 
 Academic project — EC7207 High Performance Computing, 2026.
+
+
+
+./scripts/run_benchmarks_v2.sh
+source venv/bin/activate
+streamlit run src/dashboard/app.py

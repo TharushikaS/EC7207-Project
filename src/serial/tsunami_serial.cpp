@@ -7,11 +7,11 @@
 #include <algorithm>
 
 // --- Simulation Parameters ---
-const int N = 500;              // Grid Size (N x N)
+const int N = 2000;             // Grid Size (N x N)
 const double L = 1.0;           // Physical length of the domain
 const double c = 1.0;           // Wave speed
 const double dx = L / N;        // Spatial step
-const double dt = 0.001;        // Time step (2D CFL: dt <= dx/(c*sqrt(2)))
+const double dt = 0.0005;       // Time step (2D CFL: dt <= dx/(c*sqrt(2)))
 const int STEPS = 2000;         // Total time steps
 const int OUTPUT_FREQ = 100;    // How often to save data to disk
 
@@ -31,7 +31,7 @@ int main() {
     int center_x = N / 2;
     double drop_radius = N / 15.0;
 
-    for (int y = 0; y < N; y++) {
+    for (int y = 0; y < N; y++) {   //initialize the starting wave
         for (int x = 0; x < N; x++) {
             double distance_squared = std::pow(x - center_x, 2) + std::pow(y - center_y, 2);
             if (std::sqrt(distance_squared) < drop_radius * 2) {
