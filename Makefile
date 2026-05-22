@@ -58,9 +58,12 @@ RUNS_PER_CFG   := 3   # best-of-N
 # physical cores) without editing the Makefile:  make bench MPIFLAGS=--oversubscribe
 MPIFLAGS       ?=
 
+PYTHON     ?= python3
+
 .PHONY: all build bench clean distclean help \
         serial openmp mpi hybrid cuda \
-        bench-serial bench-openmp bench-mpi bench-hybrid bench-cuda
+        bench-serial bench-openmp bench-mpi bench-hybrid bench-cuda \
+        bench-compare
 
 # =========================================================================
 # Build
@@ -126,6 +129,8 @@ endif
 	@echo ""
 	@echo ">>> Benchmark sweep complete. Results: $(BENCH_CSV)"
 	@cat $(BENCH_CSV)
+	@echo ""
+	@$(MAKE) --no-print-directory bench-compare
 
 $(GT_DIR):
 	@mkdir -p $(GT_DIR)
@@ -210,6 +215,13 @@ bench-cuda: $(CUDA_BIN)
 	echo "    runs:$$times -> best-of-$(RUNS_PER_CFG): $$best s"; \
 	echo "cuda,1,1,$$best" >> $(BENCH_CSV)
 
+# Cross-implementation correctness check. Reads the last saved frame from
+# each implementation under data/ground_truth/ and reports max abs / L2
+# differences vs the serial baseline. See scripts/compare_grids.py.
+bench-compare:
+	@echo ">>> cross-implementation correctness check"
+	@$(PYTHON) scripts/compare_grids.py
+
 # =========================================================================
 # Housekeeping
 # =========================================================================
@@ -230,7 +242,7 @@ help:
 	@echo ""
 	@echo "Per-impl convenience targets: serial openmp mpi hybrid cuda"
 	@echo "                              bench-serial bench-openmp bench-mpi"
-	@echo "                              bench-hybrid bench-cuda"
+	@echo "                              bench-hybrid bench-cuda bench-compare"
 	@echo ""
 	@echo "Variables (override on the command line):"
 	@echo "  RUNS_PER_CFG=$(RUNS_PER_CFG)   OMP_THREADS=\"$(OMP_THREADS)\""

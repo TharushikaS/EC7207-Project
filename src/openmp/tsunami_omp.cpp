@@ -95,12 +95,17 @@ int main(int argc, char* argv[]) {
                 std::swap(h_curr, h_next);
 
                 if (t % OUTPUT_FREQ == 0) {
-                //    std::string filename = "../../data/ground_truth/omp_output_" + std::to_string(t) + ".bin";
-                 //   std::ofstream outfile(filename, std::ios::binary);
-                   // if (outfile.is_open()) {
-                      //  outfile.write(reinterpret_cast<char*>(h_curr.data()), N * N * sizeof(double));
-                  //      outfile.close();
-                 //   }
+                    // Snapshot for correctness comparison against the other
+                    // implementations. Safe to do inside `omp single` — only
+                    // one thread writes, and the implicit barrier at the end
+                    // ensures threads don't re-enter the stencil until I/O
+                    // is finished.
+                    std::string filename = "../../data/ground_truth/omp_output_" + std::to_string(t) + ".bin";
+                    std::ofstream outfile(filename, std::ios::binary);
+                    if (outfile.is_open()) {
+                        outfile.write(reinterpret_cast<char*>(h_curr.data()), N * N * sizeof(double));
+                        outfile.close();
+                    }
                 }
             }
             // implicit barrier at end of single — all threads see the swapped pointers
