@@ -176,7 +176,7 @@ bench-mpi: $(MPI_BIN)
 	@for p in $(MPI_PROCS); do \
 	    times=""; \
 	    for i in $$(seq 1 $(RUNS_PER_CFG)); do \
-	        t=$$(cd $(SRC_DIR)/mpi && $(MPIEXEC) $(MPIFLAGS) -n $$p ./tsunami_mpi | $(EXTRACT_TIME)); \
+	        t=$$(cd $(SRC_DIR)/mpi && DISPLAY= $(MPIEXEC) $(MPIFLAGS) -n $$p ./tsunami_mpi 2>/dev/null | $(EXTRACT_TIME)); \
 	        times="$$times $$t"; \
 	    done; \
 	    best=$$(echo $$times | $(MIN_OF)); \
@@ -191,7 +191,7 @@ bench-hybrid: $(HYBRID_BIN)
 	    th=$$(echo $$cfg | cut -dx -f2); \
 	    times=""; \
 	    for i in $$(seq 1 $(RUNS_PER_CFG)); do \
-	        t=$$(cd $(SRC_DIR)/hybrid && $(MPIEXEC) $(MPIFLAGS) -n $$p ./tsunami_hybrid $$th | $(EXTRACT_TIME)); \
+	        t=$$(cd $(SRC_DIR)/hybrid && DISPLAY= $(MPIEXEC) $(MPIFLAGS) -n $$p ./tsunami_hybrid $$th 2>/dev/null | $(EXTRACT_TIME)); \
 	        times="$$times $$t"; \
 	    done; \
 	    best=$$(echo $$times | $(MIN_OF)); \
