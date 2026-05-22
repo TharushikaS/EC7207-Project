@@ -216,11 +216,15 @@ bench-cuda: $(CUDA_BIN)
 	echo "cuda,1,1,$$best" >> $(BENCH_CSV)
 
 # Cross-implementation correctness check. Reads the last saved frame from
-# each implementation under data/ground_truth/ and reports max abs / L2
-# differences vs the serial baseline. See scripts/compare_grids.py.
+# each implementation under data/ground_truth/ and reports differences at
+# multiple scales (max abs, max/peak, L2 rel, ULP distance) vs serial.
+# Pass extra flags through with CMP_ARGS, e.g.:
+#   make bench-compare CMP_ARGS=--verbose
+#   make bench-compare CMP_ARGS="--step 1000"
+CMP_ARGS ?=
 bench-compare:
 	@echo ">>> cross-implementation correctness check"
-	@$(PYTHON) scripts/compare_grids.py
+	@$(PYTHON) scripts/compare_grids.py $(CMP_ARGS)
 
 # =========================================================================
 # Housekeeping
