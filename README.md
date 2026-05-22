@@ -145,6 +145,8 @@ To build everything and produce the full scaling study (`data/benchmarks.csv`) w
 
 ```bash
 make bench
+DISPLAY= make bench
+make bench MPIFLAGS="--mca plm_rsh_agent sh"
 ```
 
 This runs **each configuration three times** and records the minimum time (best-case, removes one-off OS noise). The full sweep covers:
